@@ -1,6 +1,6 @@
 # Assets: Loading, Handles, Custom Loaders
 
-Targets Bevy 0.18.
+Targets Bevy 0.19.
 
 ## Basics
 
@@ -11,10 +11,12 @@ arrives later.
 ```rust
 fn setup(mut commands: Commands, assets: Res<AssetServer>) {
     let image: Handle<Image> = assets.load("sprites/player.png");   // relative to assets/
-    let scene: Handle<Scene> = assets.load(GltfAssetLabel::Scene(0).from_asset("ship.glb"));
+    let scene: Handle<WorldAsset> = assets.load(GltfAssetLabel::Scene(0).from_asset("ship.glb"));
     commands.spawn(Sprite::from_image(image));
 }
 ```
+
+(`Scene` was renamed `WorldAsset` in 0.19 — `bevy_scene` → `bevy_world_serialization`, see `reflection-scenes.md`.)
 
 - Paths are relative to the `assets/` folder next to `Cargo.toml` (or the
   executable in release). Sub-assets use labels: `"ship.glb#Scene0"` or the
@@ -35,6 +37,8 @@ fn tint(mut materials: ResMut<Assets<StandardMaterial>>, q: Query<&MeshMaterial3
     for mat in &q {
         if let Some(m) = materials.get_mut(&mat.0) { m.base_color = Color::srgb(1.0, 0.0, 0.0); }
         // get_mut flags the asset modified → re-uploaded to GPU; affects ALL users of the handle.
+        // 0.19: get_mut returns AssetMut<A> and only fires AssetEvent::Modified on an actual write
+        // (0.18 fired it on every get_mut call, even a no-op borrow).
     }
 }
 ```
@@ -130,7 +134,7 @@ consider `bevy_embedded_assets` (ecosystem).
 ## Hot reloading
 
 ```toml
-bevy = { version = "0.18", features = ["file_watcher"] }
+bevy = { version = "0.19", features = ["file_watcher"] }
 ```
 
 With the feature on (debug builds), editing a file under `assets/` reloads

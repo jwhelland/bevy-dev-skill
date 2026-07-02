@@ -1,6 +1,6 @@
-# Version Migration Cheat Sheet (0.15 → 0.18)
+# Version Migration Cheat Sheet (0.15 → 0.19)
 
-Use this to (a) read older code/tutorials and translate to 0.18, or
+Use this to (a) read older code/tutorials and translate to 0.19, or
 (b) write code for a project pinned to an older Bevy. Full per-release
 guides: bevy.org/learn/migration-guides (offline: each release's guide is
 also summarized in rustdoc release notes; this file covers the
@@ -16,6 +16,8 @@ high-traffic items).
 | `MessageReader`/`MessageWriter`, `On<E>` | 0.17+ |
 | `children![]`, `related!`, `Single` param | 0.16+ |
 | `detach_children`, `GlobalAmbientLight`, `get_disjoint_mut` | 0.18 |
+| `SceneRoot`/`DynamicSceneRoot`, `bevy_scene::Scene` | ≤0.18 (scene system renamed in 0.19) |
+| `WorldAssetRoot`, `bevy_world_serialization`, `TextFont.font_size: FontSize`, separate `Component`/`Resource` derives | 0.19 |
 
 ## 0.14 → 0.15 (required components revolution)
 
@@ -117,6 +119,118 @@ Other 0.17 changes:
 - glTF: `use_model_forward_direction` → `convert_coordinates:
   GltfConvertCoordinates`.
 
+## 0.18 → 0.19
+
+The biggest release in a while — architectural changes under the hood, plus
+several everyday-API renames.
+
+**Resources are now components** (the headline change): `#[derive(Resource)]`
+implements `Component` too, and resources live as components on dedicated
+singleton entities.
+
+- You can no longer doubly derive: `#[derive(Component, Resource)]` on one
+  type is a compile error. Split into two types (a `Comp` and a `Res`) if
+  you relied on that.
+- Broad queries like `Query<()>` or `Query<EntityMut>` now also match the
+  hidden resource entities and conflict with `Res`/`ResMut` access on the
+  same type. Add `Without<IsResource>` (or a `Without<MyResource>` filter)
+  to exclude them.
+- Non-send API renamed to match: `App::init_non_send_resource()` →
+  `init_non_send()`, `App::insert_non_send_resource()` → `insert_non_send()`,
+  `World::non_send_resource()`/`_mut()` → `World::non_send()`/`non_send_mut()`.
+- `#[derive(MapEntities)]` is no longer needed on resources — implemented by
+  default.
+
+**Scenes reorganized to make room for BSN.** The old runtime scene
+(`.scn.ron`) system moved to a new crate, freeing up `bevy_scene` for
+**BSN** (Bevy Scene Notation), Next Generation Scenes' code-first `bsn!`
+macro (a `.bsn` asset loader isn't shipping yet — BSN today is a
+code-driven workflow, e.g. `bsn! { Player { score: 0 } Team::Blue }`).
+
+| 0.18 (`bevy_scene`) | 0.19 (`bevy_world_serialization`) |
+|---|---|
+| `Scene` | `WorldAsset` |
+| `SceneRoot` | `WorldAssetRoot` |
+| `DynamicScene` | `DynamicWorld` |
+| `DynamicSceneRoot` | `DynamicWorldRoot` |
+| `DynamicSceneBuilder` | `DynamicWorldBuilder` (now takes `&TypeRegistry`) |
+| `SceneSpawner` | `WorldInstanceSpawner` |
+| `ScenePlugin` | `WorldSerializationPlugin` |
+| `SceneLoader` | `WorldAssetLoader` |
+| `SceneFilter` | `WorldFilter` |
+
+glTF scene spawning uses the new name too:
+
+```rust
+// 0.18
+commands.spawn(SceneRoot(assets.load("ship.glb#Scene0")));
+// 0.19
+commands.spawn(WorldAssetRoot(assets.load("ship.glb#Scene0")));
+```
+
+**Text overhaul**: text internals moved from `cosmic-text` to `parley`.
+`TextFont` field types changed:
+
+```rust
+// 0.18
+TextFont { font: assets.load("font.ttf"), font_size: 24.0, ..default() }
+// 0.19
+TextFont { font: assets.load("font.ttf").into(), font_size: FontSize::Px(24.0), ..default() }
+```
+
+`font: Handle<Font>` → `FontSource` (call `.into()` on a handle);
+`font_size: f32` → `FontSize` (wrap in `FontSize::Px(...)`).
+`TextLayout::new_with_justify()`/`new_with_linebreak()`/`new_with_no_wrap()`
+→ `TextLayout::justify()`/`linebreak()`/`no_wrap()`.
+
+**Atmosphere restructured**: moved to `bevy::light::Atmosphere`, spawned as
+its own entity instead of a camera component, and radii renamed:
+
+```rust
+// 0.18
+commands.spawn((Camera3d::default(), Atmosphere::earthlike(medium)));
+// 0.19
+use bevy::light::Atmosphere;
+let earth = Atmosphere::earth(medium);
+commands.spawn((earth, Transform::from_scale(Vec3::splat(0.001))));
+commands.spawn((Camera3d::default(), AtmosphereSettings::default()));
+```
+
+`Atmosphere::earthlike()` → `Atmosphere::earth()`; `bottom_radius`/
+`top_radius` → `inner_radius`/`outer_radius`; `AtmosphereSettings` dropped
+`scene_units_to_m` (use `Transform` scale on the atmosphere entity instead).
+
+**Feathers/widgets stabilized**: `experimental_bevy_feathers` feature →
+`bevy_feathers`; `FeathersPlugin` → `FeathersCorePlugin`;
+`experimental_ui_widgets` → `bevy_ui_widgets` (now part of the `ui` feature
+collection); `UiWidgetsPlugins`/`InputDispatchPlugin` are now in
+`DefaultPlugins`. Widget component prefixes dropped: `CoreScrollbarThumb` →
+`ScrollbarThumb`, `CoreSliderDragState` → `SliderDragState`. `InputFocus`'s
+`.0` field is private now — use `.get()`/`.set(entity)`/`.clear()`.
+
+**Audio feature decoupled**: `audio` is no longer implied by `2d`/`3d`/`ui`
+— enable it explicitly in slimmed `default-features = false` builds. Rodio
+bumped to 0.22; format features renamed/split: `vorbis`, `wav`, `mp3`,
+`mp4`, `flac`, `aac`, plus `symphonia-*` backend features and an
+`audio-all-formats` convenience collection.
+
+**Misc renames worth knowing**:
+
+- `ShaderStorageBuffer` → `ShaderBuffer`.
+- `Font::try_from_bytes()` → `Font::from_bytes()` (no longer returns `Result`).
+- `Assets::get_mut()` now returns `AssetMut<A>` and only fires
+  `AssetEvent::Modified` on an actual mutation (was: every call).
+- `AssetPath::resolve(&str)` → takes `&AssetPath` now; use `resolve_str()`
+  for a plain string argument (same split for `resolve_embed`).
+- glTF materials load as `Handle<GltfMaterial>` by default now, not
+  `Handle<StandardMaterial>`; append `/std` to the asset label
+  (`"model.glb#Material0/std"`) to get a `StandardMaterial` handle.
+- Render graph replaced by ECS systems/schedules internally — only matters
+  if you wrote custom render-graph nodes; `Material`/`MaterialExtension`/
+  `FullscreenMaterial` users are unaffected.
+- Bloom's luma calculation moved to linear color space — subtly different
+  look at the same settings, not a code change.
+
 ## Upgrading a project: process
 
 1. Bump one minor version at a time; read that release's migration guide.
@@ -125,4 +239,6 @@ Other 0.17 changes:
    `cargo tree -d` to catch duplicates).
 4. Watch runtime behavior changes that compile fine: state re-trigger
    semantics (0.18), `Option<Single>` multi-match (0.17), message
-   double-buffer timing, despawn-recursive default (0.16).
+   double-buffer timing, despawn-recursive default (0.16), broad
+   `Query<()>`/`EntityMut` queries silently picking up resource entities
+   (0.19 — filter with `Without<IsResource>`).

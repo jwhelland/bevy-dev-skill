@@ -1,6 +1,6 @@
 # Reflection, Scenes, Serialization
 
-Targets Bevy 0.18.
+Targets Bevy 0.19.
 
 ## Reflect
 
@@ -41,22 +41,37 @@ let registry = app.world().resource::<AppTypeRegistry>().read();
 
 ## Scenes
 
-A `Scene`/`DynamicScene` is a serialized set of entities + components (and
-resources). Bevy's scene format is `.scn.ron`.
+**0.19 renamed the old runtime scene system to make room for BSN** (see
+below). The serialized-entities system now lives in
+`bevy_world_serialization` (`bevy::world_serialization`); `bevy_scene` is
+the new BSN crate. Rename table (also in `migration.md`):
+
+| ≤0.18 (`bevy_scene`) | 0.19 (`bevy_world_serialization`) |
+|---|---|
+| `Scene` | `WorldAsset` |
+| `SceneRoot` | `WorldAssetRoot` |
+| `DynamicScene` | `DynamicWorld` |
+| `DynamicSceneRoot` | `DynamicWorldRoot` |
+| `DynamicSceneBuilder` | `DynamicWorldBuilder` |
+| `SceneSpawner` | `WorldInstanceSpawner` |
+| `ScenePlugin` | `WorldSerializationPlugin` |
+
+A `WorldAsset`/`DynamicWorld` is a serialized set of entities + components
+(and resources). Bevy's world-asset format is still `.scn.ron`.
 
 ### Spawning
 
 ```rust
-commands.spawn(DynamicSceneRoot(assets.load("levels/level1.scn.ron")));
-// glTF scenes use SceneRoot (rendering-3d.md)
+commands.spawn(DynamicWorldRoot(assets.load("levels/level1.scn.ron")));
+// glTF scenes use WorldAssetRoot (rendering-3d.md)
 ```
 
-Scene contents spawn as *children* of the root entity; despawn the root to
+Contents spawn as *children* of the root entity; despawn the root to
 unload the level. React to load completion by observing
 `SceneInstanceReady` on the root:
 
 ```rust
-commands.spawn(DynamicSceneRoot(handle))
+commands.spawn(DynamicWorldRoot(handle))
     .observe(|ev: On<SceneInstanceReady>, q: Query<&Children>| { /* post-process */ });
 ```
 
@@ -64,16 +79,19 @@ commands.spawn(DynamicSceneRoot(handle))
 
 ```rust
 fn save(world: &World) {
-    let scene = DynamicSceneBuilder::from_world(world)
+    let registry = world.resource::<AppTypeRegistry>().read();
+    let scene = DynamicWorldBuilder::from_world(world, &registry)
         .allow_component::<Health>()
         .allow_component::<Transform>()
         .extract_entities(world.iter_entities().map(|e| e.id()))
         .build();
-    let registry = world.resource::<AppTypeRegistry>().read();
     let ron = scene.serialize(&registry).unwrap();
     // Write to assets/levels/... (native only; use IoTaskPool for async file IO)
 }
 ```
+
+`DynamicWorldBuilder::from_world` now takes the type registry up front
+(0.18 took it only at `.serialize()` time).
 
 Only registered types with `#[reflect(Component)]` serialize. Entity ids in
 files are placeholders; references remap on spawn.
@@ -100,8 +118,24 @@ files are placeholders; references remap on spawn.
 
 Hot reloading (`file_watcher` feature) makes `.scn.ron` files live-editable.
 
-Note: a next-gen scene system ("BSN") has been in development; 0.18 still
-uses the format above. Check release notes when upgrading past 0.18.
+### BSN (Bevy Scene Notation) — the new code-driven scene system
+
+0.19 shipped "Next Generation Scenes": a `bsn!` macro (crate `bevy_scene`)
+for defining composable, patchable scene fragments directly in Rust code:
+
+```rust
+bsn! {
+    Player { score: 0 }
+    Team::Blue
+}
+```
+
+BSN supports optional fields, relationships, scene functions, and inline
+asset templates. There is **no first-party `.bsn` asset file loader yet** —
+today it's a code-first workflow, not a replacement for the `.scn.ron`
+asset pipeline above. Use `bevy_world_serialization` for
+data-driven/asset-file scenes; reach for `bsn!` when you want scene
+fragments defined and versioned alongside Rust code.
 
 ## Save games & general serialization
 

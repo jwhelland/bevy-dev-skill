@@ -1,12 +1,16 @@
 # Audio and Animation
 
-Targets Bevy 0.18.
+Targets Bevy 0.19.
 
 ## Audio
 
-Built-in audio (`bevy_audio`, rodio-backed) is simple playback. For mixing
-buses, effects chains, ducking → use `bevy_kira_audio` or `bevy_seedling`
-(`ecosystem.md`).
+Built-in audio (`bevy_audio`, rodio-backed, bumped to rodio 0.22 in 0.19)
+is simple playback. For mixing buses, effects chains, ducking → use
+`bevy_kira_audio` or `bevy_seedling` (`ecosystem.md`).
+
+**0.19: `audio` is no longer implied by the `2d`/`3d`/`ui` feature
+collections** — if you use `default-features = false`, add `audio`
+explicitly to get sound.
 
 ```rust
 // Fire-and-forget sound effect:
@@ -37,8 +41,10 @@ fn pause_music(sinks: Query<&AudioSink, With<Music>>, keys: Res<ButtonInput<KeyC
 - Global volume: `GlobalVolume` resource.
 - Spatial audio: `.with_spatial(true)` + a `SpatialListener` component on
   the camera/player; pan/attenuation follow transforms.
-- Formats by feature flag: ogg/vorbis on by default; `mp3`, `flac`, `wav`
-  features available. Prefer ogg.
+- Formats by feature flag: `vorbis` (ogg) on by default; `wav`, `mp3`,
+  `mp4`, `flac`, `aac` features available, plus `symphonia-*` backend
+  features and an `audio-all-formats` convenience collection (0.19 rodio
+  bump renamed/split these). Prefer ogg.
 
 ## Animation
 
@@ -65,9 +71,10 @@ fn setup(mut commands: Commands, assets: Res<AssetServer>,
     ]);
     let graph = graphs.add(graph);
     commands.insert_resource(Animations { graph, idle: indices[0], run: indices[1] });
-    commands.spawn(SceneRoot(assets.load(GltfAssetLabel::Scene(0).from_asset("character.glb"))));
+    commands.spawn(WorldAssetRoot(assets.load(GltfAssetLabel::Scene(0).from_asset("character.glb"))));
 }
 
+// `SceneRoot` was renamed `WorldAssetRoot` in 0.19 (reflection-scenes.md).
 // The AnimationPlayer lives on a child entity spawned by the scene. Attach the
 // graph when players appear:
 fn attach(mut commands: Commands, anims: Res<Animations>,
@@ -102,9 +109,12 @@ easing is less ceremony.
 ## Gotchas
 
 - No sound on Linux: often missing alsa/pulse dev packages at build time.
-- `AnimationPlayer` is on a *descendant* entity of the `SceneRoot`, not the
-  root — query `Added<AnimationPlayer>` (as above) or traverse children.
+- `AnimationPlayer` is on a *descendant* entity of the `WorldAssetRoot`, not
+  the root — query `Added<AnimationPlayer>` (as above) or traverse children.
 - An `AnimationGraphHandle` must be on the same entity as the player or
   nothing plays.
+- 0.19 changed the `AnimationTargetId` hashing algorithm; retargeting logic
+  that stores IDs across a version bump (rather than re-deriving from
+  names) can silently stop matching.
 - wasm audio requires a user gesture before playback (browser policy) —
   start audio after first click/keypress.

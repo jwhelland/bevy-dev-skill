@@ -1,6 +1,29 @@
 # ECS Advanced: Change Detection, Hooks, Relationships, Exclusive Access
 
-Targets Bevy 0.18. Prereq: `ecs-core.md`.
+Targets Bevy 0.19. Prereq: `ecs-core.md`.
+
+## Resources are components (0.19)
+
+`Resource` is now a subtrait of `Component`; resources are stored as
+components on dedicated singleton entities under the hood. Two practical
+consequences:
+
+- **You can no longer doubly derive `Component` and `Resource` on the same
+  type** (`#[derive(Component, Resource)] struct X;` is a compile error
+  now). If you had a type used both ways, split it into a distinct
+  component type and resource type.
+- **Broad queries can accidentally match resource entities.** `Query<()>`,
+  `Query<EntityMut>`, and similar "match everything" queries now also see
+  the hidden resource entities, and will conflict with `Res`/`ResMut`
+  access on the same system. Filter them out with `Without<IsResource>` (or
+  `Without<MyResource>` for a specific one).
+
+Non-send API was renamed to match the new `Send`/non-`Send` split:
+`App::init_non_send_resource()` → `init_non_send()`,
+`App::insert_non_send_resource()` → `insert_non_send()`,
+`World::non_send_resource()`/`_mut()` → `World::non_send()`/`non_send_mut()`.
+`#[derive(MapEntities)]` is no longer required on resources — implemented
+by default now.
 
 ## Change detection
 

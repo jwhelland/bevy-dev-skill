@@ -1,6 +1,6 @@
 # Input and Windowing
 
-Targets Bevy 0.18. Note: 0.18 split input sources behind features
+Targets Bevy 0.19. Note: 0.18 split input sources behind features
 (`keyboard`, `mouse`, `gamepad`, `touch`, `gestures`) — all on by default
 with `DefaultPlugins`, relevant only for `default-features = false` builds.
 

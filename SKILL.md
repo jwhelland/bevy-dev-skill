@@ -12,18 +12,18 @@ description: >-
   code written for an older Bevy, choosing Bevy ecosystem crates (avian,
   leafwing-input-manager, bevy_egui...), and architecting a Bevy project.
   Use it even for small "quick" Bevy snippets: Bevy APIs changed heavily
-  across 0.15-0.18 and answers from memory often won't compile — this skill
+  across 0.15-0.19 and answers from memory often won't compile — this skill
   carries the current names and migration tables. If the user is making a
   Rust game with an ECS and the framework is unstated, use this skill.
 ---
 
 # Bevy Development
 
-This skill targets **Bevy 0.18** (released January 2026). Bevy's API changes
+This skill targets **Bevy 0.19** (released June 2026). Bevy's API changes
 significantly between minor versions, so first check the project's actual
 version (`grep 'bevy' Cargo.toml` or `cargo tree -p bevy --depth 0`). If the
 project is on an older version, read [references/migration.md](references/migration.md) to translate —
-it maps every major rename across 0.15 → 0.16 → 0.17 → 0.18 in both
+it maps every major rename across 0.15 → 0.16 → 0.17 → 0.18 → 0.19 in both
 directions.
 
 ## Ground truth: generated docs beat this skill
@@ -81,7 +81,7 @@ Read only what the task needs — each file is self-contained.
 | Architecture & best practices for any nontrivial feature | [references/patterns.md](references/patterns.md) |
 | Tests, headless apps, diagnosing panics & B-codes | [references/testing-debugging.md](references/testing-debugging.md) |
 | "What crate should I use for physics/input/UI/...?" | [references/ecosystem.md](references/ecosystem.md) |
-| Project is on Bevy < 0.18, or code uses old names | [references/migration.md](references/migration.md) |
+| Project is on Bevy < 0.19, or code uses old names | [references/migration.md](references/migration.md) |
 | Airgapped setup, vendoring, local docs | [references/offline-docs.md](references/offline-docs.md) |
 
 For any feature bigger than a single system, read
@@ -91,19 +91,24 @@ granularity, and the common architectural mistakes.
 ## Names that recently changed — write these, not the old ones
 
 Tested models reliably slip on a handful of renames even when they know
-0.18 broadly. Current names (left), common stale habit (right):
+0.19 broadly. Current names (left), common stale habit (right):
 
-| Write this (0.18) | Not this |
+| Write this (0.19) | Not this |
 |---|---|
+| `WorldAssetRoot` for glTF/scene-file spawning | `SceneRoot` |
+| `bevy_world_serialization` / `bevy::world_serialization` (`WorldAsset`, `DynamicWorld`, `DynamicWorldRoot`) | `bevy_scene` types (`Scene`, `DynamicScene`, `DynamicSceneRoot`) — `bevy_scene` now means BSN |
+| Separate `#[derive(Component)]` and `#[derive(Resource)]` types | `#[derive(Component, Resource)]` on one type (no longer compiles) |
+| `TextFont { font: handle.into(), font_size: FontSize::Px(24.0), .. }` | `font: handle, font_size: 24.0` |
+| `Atmosphere::earth()`, spawned on its own entity | `Atmosphere::earthlike()` as a camera component |
+| `bevy_feathers` / `FeathersCorePlugin` | `experimental_bevy_feathers` / `FeathersPlugin` |
+| `App::init_non_send()` / `insert_non_send()`, `World::non_send()` | `init_non_send_resource()` / `insert_non_send_resource()`, `non_send_resource()` |
 | `timer.is_finished()` / `is_paused()` | `finished()` / `paused()` |
 | `MessageReader` / `MessageWriter`, `writer.write(m)`, `app.add_message` | `EventReader`/`EventWriter`, `send`, `add_event` |
 | `On<MyEvent>` observer param, `On<Add, T>` | `Trigger<MyEvent>`, `Trigger<OnAdd, T>` |
 | `entity.despawn()` (recursive by default) | `despawn_recursive()` |
 | `query.get_disjoint_mut([a, b])` | `get_many_mut` |
 | `detach_children` / `detach_all_children` | `remove_children` / `clear_children` |
-| `GlobalAmbientLight` resource | `AmbientLight` resource |
 | `use bevy::ecs::lifecycle::HookContext` | `bevy::ecs::component::HookContext` |
-| `use bevy::shader::ShaderRef` (`AsBindGroup` stays in `render::render_resource`) | `bevy::render::render_resource::ShaderRef` |
 | `Gizmos::cube` | `Gizmos::cuboid` |
 | `Justify`, `SystemCondition`, `*Systems` set names | `JustifyText`, `Condition`, `*Set`/`*System` |
 
@@ -113,7 +118,7 @@ Full mapping (and reverse, for older projects): [references/migration.md](refere
 
 ```toml
 [dependencies]
-bevy = "0.18"
+bevy = "0.19"
 # Faster iterative compiles during development:
 [profile.dev]
 opt-level = 1
@@ -121,11 +126,13 @@ opt-level = 1
 opt-level = 3
 ```
 
-Use `bevy = { version = "0.18", features = ["dynamic_linking"] }` only for
-local dev iteration (never ship it). 0.18 added scenario feature collections:
-`default-features = false, features = ["2d"]` (or `"3d"`, `"ui"`) to slim
-builds. For fast linking, configure a faster linker in `.cargo/config.toml`
-(lld on Linux/Windows; macOS default linker is already fast).
+Use `bevy = { version = "0.19", features = ["dynamic_linking"] }` only for
+local dev iteration (never ship it). Scenario feature collections slim
+builds: `default-features = false, features = ["2d"]` (or `"3d"`, `"ui"`).
+**0.19: `audio` is no longer implied by `2d`/`3d`/`ui`** — add it explicitly
+if you want sound with a slimmed feature set. For fast linking, configure a
+faster linker in `.cargo/config.toml` (lld on Linux/Windows; macOS default
+linker is already fast).
 
 Minimal app:
 
@@ -154,4 +161,4 @@ fn hello(time: Res<Time>) {
 When writing code for the user, state which Bevy version the code targets.
 If the user's `Cargo.toml` pins an older version, write code for *their*
 version using the migration tables — do not silently mix API generations
-(e.g. `EventReader` from 0.16 with `children![]` from 0.18).
+(e.g. `EventReader` from 0.16 with `WorldAssetRoot` from 0.19).

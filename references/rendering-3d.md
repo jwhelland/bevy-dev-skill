@@ -1,6 +1,6 @@
 # 3D Rendering: Meshes, PBR, Lights, Cameras, Custom Materials
 
-Targets Bevy 0.18.
+Targets Bevy 0.19.
 
 ## Minimal 3D scene
 
@@ -33,16 +33,23 @@ Primitive meshes: `Cuboid`, `Sphere`, `Plane3d`, `Cylinder`, `Capsule3d`,
 
 ```rust
 commands.spawn((
-    SceneRoot(assets.load(GltfAssetLabel::Scene(0).from_asset("ship.glb"))),
+    WorldAssetRoot(assets.load(GltfAssetLabel::Scene(0).from_asset("ship.glb"))),
     Transform::from_xyz(0.0, 0.0, 0.0),
 ));
 ```
 
-The scene spawns as a hierarchy of child entities (named via `Name`). To
-modify materials/parts after spawn, query children once loaded (observe
+`SceneRoot` was renamed `WorldAssetRoot` in 0.19 (`bevy_scene` →
+`bevy_world_serialization`, see `migration.md`/`reflection-scenes.md`). The
+scene spawns as a hierarchy of child entities (named via `Name`). To modify
+materials/parts after spawn, query children once loaded (observe
 `SceneInstanceReady`) and match by `Name`. Typed access to gltf parts:
-`Res<Assets<Gltf>>` → `gltf.named_meshes`, `.animations`, etc. 0.18 adds
-`GltfExtensionHandler` for custom glTF extension processing.
+`Res<Assets<Gltf>>` → `gltf.named_meshes`, `.animations`, etc.
+`GltfExtensionHandler` exists for custom glTF extension processing
+(`on_material()` now receives `&GltfMaterial`).
+
+**glTF materials load as `Handle<GltfMaterial>` by default in 0.19**, not
+`Handle<StandardMaterial>`. Append `/std` to the asset label to get a
+`StandardMaterial` handle instead: `"ship.glb#Material0/std"`.
 
 ## StandardMaterial (PBR) highlights
 
@@ -84,9 +91,25 @@ On the camera entity: `Camera { hdr: true, order, clear_color, .. }`,
 `Projection::Perspective(...)`, `Tonemapping`, `Bloom`,
 `ScreenSpaceAmbientOcclusion`, `TemporalAntiAliasing`/`Msaa`/`Fxaa`/`Smaa`,
 `DepthOfField`, `MotionBlur`, `DistanceFog` (component `DistanceFog`),
-`Skybox`, `Atmosphere` (procedural sky; 0.18: `Atmosphere::earthlike()` and
-`ScatteringMedium` asset). `RenderTarget` is its own component in 0.18
+`Skybox` (0.19: its `image` field is `Option<Handle<Image>>` — wrap
+existing handles in `Some(...)`). `RenderTarget` is its own component
 (render-to-texture: `RenderTarget::Image(image_handle.into())`).
+
+**Procedural sky (`Atmosphere`) is a separate entity as of 0.19**, not a
+camera component, and moved to `bevy::light::Atmosphere`:
+
+```rust
+use bevy::light::Atmosphere;
+
+let earth = Atmosphere::earth(medium_handle);   // was Atmosphere::earthlike()
+commands.spawn((earth, Transform::from_scale(Vec3::splat(0.001))));
+commands.spawn((Camera3d::default(), AtmosphereSettings::default()));
+```
+
+`bottom_radius`/`top_radius` → `inner_radius`/`outer_radius`;
+`AtmosphereSettings` dropped `scene_units_to_m` (use the atmosphere
+entity's `Transform` scale instead). `ScatteringMedium` is still the asset
+type for custom media.
 
 0.18 ships `FreeCamera`/`FreeCameraPlugin` (fly camera) for quick scene
 inspection.
@@ -120,8 +143,8 @@ etc.).
 ## Custom materials (WGSL shader)
 
 ```rust
-use bevy::render::render_resource::AsBindGroup; // still here in 0.18
-use bevy::shader::ShaderRef; // 0.18: moved here from bevy::render::render_resource (E0432 if stale)
+use bevy::render::render_resource::AsBindGroup; // still here in 0.19
+use bevy::shader::ShaderRef; // moved here from bevy::render::render_resource in 0.18 (E0432 if stale)
 
 #[derive(Asset, TypePath, AsBindGroup, Clone)]
 struct GlowMaterial {
@@ -133,6 +156,7 @@ impl Material for GlowMaterial {
     fn fragment_shader() -> ShaderRef { "shaders/glow.wgsl".into() }
     fn alpha_mode(&self) -> AlphaMode { AlphaMode::Blend }
 }
+// 0.19: AsBindGroup now requires a `fn label()` too (derive provides a default from the type name).
 
 app.add_plugins(MaterialPlugin::<GlowMaterial>::default());
 // spawn with MeshMaterial3d(glow_materials.add(GlowMaterial { ... }))
@@ -155,11 +179,14 @@ for airgapped/single-binary builds (`assets.md`).
 ## Render-world internals (when patterns above aren't enough)
 
 Custom render features involve: `ExtractComponentPlugin`/extract systems
-(copy data main→render world), `RenderApp` sub-app, render phases, and the
-render graph. This is deep water — read the rustdoc for `bevy_render` and
-the repo examples under `examples/shader/` and `examples/3d/`. Avoid it
-unless `Material`/`MaterialExtension`/`FullscreenMaterial` truly can't
-express the effect.
+(copy data main→render world), `RenderApp` sub-app, and render phases. In
+0.19 the render graph was replaced internally by ordinary ECS
+systems/schedules — custom render-graph nodes need updating (custom phases
+now use a change-list system and `DirtySpecializations`), but
+`Material`/`MaterialExtension`/`FullscreenMaterial` code is unaffected.
+This is deep water either way — read the rustdoc for `bevy_render` and the
+repo examples under `examples/shader/` and `examples/3d/`. Avoid it unless
+those higher-level APIs truly can't express the effect.
 
 ## 3D gotchas
 

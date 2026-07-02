@@ -1,6 +1,6 @@
 # ECS Core: Entities, Components, Systems, Queries
 
-Targets Bevy 0.18. For hooks, observers, relationships, change detection →
+Targets Bevy 0.19. For hooks, observers, relationships, change detection →
 `ecs-advanced.md`.
 
 ## Components
@@ -156,6 +156,11 @@ fn write(mut score: ResMut<Score>) { score.0 += 1; }
 Use a resource when there is logically exactly one (settings, score, RNG
 state). If "one per player/level" could ever apply, make it a component on
 an entity instead.
+
+As of 0.19, `Resource` is a subtrait of `Component` (resources are stored
+as components on hidden singleton entities) — a type can no longer derive
+both `Component` and `Resource`. Usually invisible day-to-day, but see
+`ecs-advanced.md` for the query-conflict gotcha it introduces.
 
 ## Entity references
 

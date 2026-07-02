@@ -1,6 +1,6 @@
 # Messages, Events, and Observers
 
-Targets Bevy 0.18. Since 0.17 Bevy has **two distinct systems** that were
+Targets Bevy 0.19. Since 0.17 Bevy has **two distinct systems** that were
 both called "events" before:
 
 | | Messages (buffered) | Events (observed) |

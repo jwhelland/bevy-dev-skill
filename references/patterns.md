@@ -1,6 +1,6 @@
 # Architecture & Best Practices
 
-Targets Bevy 0.18. Read this before building any nontrivial feature.
+Targets Bevy 0.19. Read this before building any nontrivial feature.
 
 ## Project organization
 

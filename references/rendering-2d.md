@@ -1,6 +1,6 @@
 # 2D Rendering: Sprites, Atlases, Text2d, Tilemaps
 
-Targets Bevy 0.18.
+Targets Bevy 0.19.
 
 ## Camera
 
@@ -27,8 +27,8 @@ commands.spawn((
 `AutoMax`. For pixel art also set `ImagePlugin::default_nearest()` on
 DefaultPlugins.
 
-- 0.18 ships `PanCamera` + `PanCameraPlugin` for ready-made 2D pan/zoom
-  controls (dev tooling; fine to use in-game too).
+- `PanCamera` + `PanCameraPlugin` give ready-made 2D pan/zoom controls (dev
+  tooling; fine to use in-game too); 0.19 added mouse-drag panning to it.
 
 ## Sprites
 
@@ -96,11 +96,16 @@ Custom 2D shader: implement `Material2d` (same shape as `Material`, see
 ```rust
 commands.spawn((
     Text2d::new("damage!"),
-    TextFont { font: assets.load("fonts/Mono.ttf"), font_size: 24.0, ..default() },
+    TextFont { font: assets.load("fonts/Mono.ttf").into(), font_size: FontSize::Px(24.0), ..default() },
     TextColor(Color::srgb(1.0, 0.3, 0.3)),
     Transform::from_xyz(0.0, 40.0, 50.0),
 ));
 ```
+
+0.19: `TextFont.font` is `FontSource` (call `.into()` on a `Handle<Font>`)
+and `.font_size` is `FontSize` (`FontSize::Px(24.0)`, not a bare `f32`) —
+text internals moved from `cosmic-text` to `parley`. See `ui.md` for the
+full text-system rundown.
 
 UI-space text is `Text` (see `ui.md`). Multi-style runs use child
 `TextSpan` entities.
