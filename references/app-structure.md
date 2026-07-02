@@ -1,6 +1,6 @@
 # App Structure: Plugins, Schedules, States, Ordering
 
-Targets Bevy 0.18.
+Targets Bevy 0.19.
 
 ## App and plugins
 
@@ -145,7 +145,8 @@ fn start(mut next: ResMut<NextState<GameState>>) {
   `OnEnter`/`OnExit`/`OnTransition` schedules run then.
 - **0.18 change**: `next.set(same_state)` *re-triggers* the transition
   (OnExit+OnEnter run again). Use `set_if_neq` for the old "only if
-  different" behavior.
+  different" behavior. 0.19: `DespawnOnEnter`/`DespawnOnExit` can now also
+  fire during same-state re-triggers.
 - **SubStates**: state that only exists within a parent state.
 
 ```rust

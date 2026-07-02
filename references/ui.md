@@ -1,9 +1,9 @@
 # UI: Nodes, Layout, Widgets, Picking
 
-Targets Bevy 0.18. Bevy UI is ECS-based: every UI element is an entity with
+Targets Bevy 0.19. Bevy UI is ECS-based: every UI element is an entity with
 a `Node` component; layout is flexbox/grid (taffy). `bevy_feathers` is the
-first-party widget/theme set (still maturing — for heavy editor-style UI
-consider `bevy_egui`, see `ecosystem.md`).
+first-party widget/theme set, stabilized (no longer `experimental_*`) in
+0.19 — for heavy editor-style UI consider `bevy_egui`, see `ecosystem.md`.
 
 ## Core structure
 
@@ -22,7 +22,7 @@ fn setup_ui(mut commands: Commands, assets: Res<AssetServer>) {
         children![
             (
                 Text::new("Hello"),
-                TextFont { font: assets.load("fonts/Mono.ttf"), font_size: 32.0, ..default() },
+                TextFont { font: assets.load("fonts/Mono.ttf").into(), font_size: FontSize::Px(32.0), ..default() },
                 TextColor(Color::WHITE),
             ),
             (
@@ -90,6 +90,14 @@ model serves sprites (`sprite_picking`) and 3D meshes (`mesh_picking`).
 `TextColor`, `TextLayout` (justify, linebreak). Rich text = child
 `TextSpan` entities, each with their own font/color. To mutate text:
 
+**0.19 text overhaul** (`cosmic-text` → `parley`): `TextFont.font` is now
+`FontSource` (`handle.into()`), `TextFont.font_size` is now `FontSize`
+(`FontSize::Px(32.0)`; also supports viewport/rem-relative units).
+`TextLayout::new_with_justify()`/`new_with_linebreak()`/`new_with_no_wrap()`
+→ `TextLayout::justify()`/`linebreak()`/`no_wrap()`. New `EditableText`
+component gives upstream text-input support (IME, multiline, Unicode-aware)
+— see the `text_input` example.
+
 ```rust
 fn update_score(score: Res<Score>, mut q: Query<&mut Text, With<ScoreLabel>>) {
     if score.is_changed() {
@@ -109,19 +117,28 @@ fonts), `FontFeatures` (OpenType), and per-span picking (hyperlinks).
   feathers widgets. 0.18: `IgnoreScroll` lets a child opt out.
 - `RelativeCursorPosition` component gives the cursor pos within a node.
 
-## bevy_feathers / standard widgets (0.18)
+## bevy_feathers / standard widgets
 
-Feathers (feature `experimental_bevy_feathers`) provides themed widgets
-built on `bevy_ui_widgets` headless behaviors: buttons, sliders, checkbox,
-radio (`RadioButton`/`RadioGroup`), color pickers (`ColorPlane` new in
-0.18), `Popover`, `MenuPopup`, virtual keyboard. API is still
-`experimental_*` — check `cargo doc -p bevy_feathers` for the exact
-constructors in your pinned version before writing code against it. For
-shipping games, custom-styled `Button`+observers or egui are safer bets.
+Feathers (feature `bevy_feathers`, stabilized from `experimental_bevy_feathers`
+in 0.19) provides themed widgets built on `bevy_ui_widgets` headless
+behaviors (feature `bevy_ui_widgets`, formerly `experimental_ui_widgets` —
+now part of the `ui` feature collection, and its plugins
+(`UiWidgetsPlugins`, `InputDispatchPlugin`) ship in `DefaultPlugins`):
+buttons, sliders, checkbox, radio (`RadioButton`/`RadioGroup`), color
+pickers (`ColorPlane`), `Popover`, `MenuPopup`, virtual keyboard, and (0.19)
+text input/dropdowns/list views. Plugin renamed: `FeathersPlugin` →
+`FeathersCorePlugin`. Widget component names dropped their `Core` prefix:
+`CoreScrollbarThumb` → `ScrollbarThumb`, `CoreSliderDragState` →
+`SliderDragState`. Some spawning helper functions were renamed too (e.g.
+`button` → `button_bundle`); check `cargo doc -p bevy_feathers` for the
+exact constructors in your pinned version before writing code against it.
+For shipping games, custom-styled `Button`+observers or egui are still
+often simpler.
 
-Directional (gamepad/keyboard) navigation: 0.18 adds
-`AutoDirectionalNavigation` for automatic focus graphs; `InputFocus`
-resource tracks focus.
+Directional (gamepad/keyboard) navigation: `AutoDirectionalNavigation` for
+automatic focus graphs; `InputFocus` resource tracks focus — as of 0.19 its
+inner `Entity` field is private, use `.get()` / `.set(entity)` / `.clear()`
+instead of `.0`.
 
 ## Layout debugging
 

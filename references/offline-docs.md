@@ -25,8 +25,8 @@ cargo doc --document-private-items # include non-pub items when reading internal
 All dependency source lives unpacked in the cargo registry:
 
 ```bash
-ls ~/.cargo/registry/src/*/bevy_ecs-0.18*/
-rg "fn get_disjoint_mut" ~/.cargo/registry/src/*/bevy_ecs-0.18*/src/
+ls ~/.cargo/registry/src/*/bevy_ecs-0.19*/
+rg "fn get_disjoint_mut" ~/.cargo/registry/src/*/bevy_ecs-0.19*/src/
 rg --type rust "pub fn viewport_to_world" ~/.cargo/registry/src/*/bevy_camera*/
 ```
 
@@ -35,7 +35,7 @@ what does the doc comment say" definitively. Doc comments in source ≙
 rustdoc content.
 
 **Bevy's examples directory is the best learning resource and ships in the
-crate**: `~/.cargo/registry/src/*/bevy-0.18*/examples/` — hundreds of
+crate**: `~/.cargo/registry/src/*/bevy-0.19*/examples/` — hundreds of
 runnable, current examples organized by topic (`2d/`, `3d/`, `ecs/`,
 `ui/`, `shader/`, `audio/`, `games/`). When unsure how to wire a feature,
 `rg` these examples first.
